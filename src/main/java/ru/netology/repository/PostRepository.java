@@ -1,9 +1,9 @@
 package ru.netology.repository;
 
 import org.springframework.stereotype.Repository;
+import ru.netology.model.InternalPost;
 import ru.netology.model.Post;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -12,22 +12,49 @@ import java.util.concurrent.ConcurrentHashMap;
 @Repository
 public class PostRepository {
 
-    private final Map<Long, Post> posts = new ConcurrentHashMap<>();
+    private final Map<Long, InternalPost> posts = new ConcurrentHashMap<>();
+
+    public List<Post> all(boolean includeDeleted) {
+        return posts.values().stream()
+                .filter((p) -> p.notDeleted() || includeDeleted)
+                .map(InternalPost::toPost)
+                .toList();
+    }
 
     public List<Post> all() {
-        return new ArrayList<>(posts.values());
+        return all(false);
+    }
+
+    public Optional<Post> getById(long id, boolean includeDeleted) {
+        if (!posts.containsKey(id) ) {
+            return Optional.empty();
+        }
+        if (includeDeleted) {
+            return Optional.of(posts.get(id).toPost());
+        }
+        return posts.get(id).toPostIfNotDeleted();
     }
 
     public Optional<Post> getById(long id) {
-        return posts.containsKey(id) ? Optional.of(posts.get(id)) : Optional.empty();
+        return getById(id, false);
     }
 
     public Post save(Post post) {
-        posts.put(post.getId(), post);
+        posts.put(post.getId(), new InternalPost(post));
         return post;
     }
 
+    public void removeById(long id, boolean permanent) {
+        if (posts.containsKey(id)) {
+            if (permanent) {
+                posts.remove(id);
+            } else {
+                posts.get(id).setDeleted(true);
+            }
+        }
+    }
+
     public void removeById(long id) {
-        posts.remove(id);
+        removeById(id, false);
     }
 }
